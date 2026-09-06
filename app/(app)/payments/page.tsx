@@ -1,6 +1,5 @@
+import { requireBusiness } from '@/lib/business';
 import { createClient } from '@/lib/supabase/server';
-import { isSupabaseConfigured } from '@/lib/supabase/is-configured';
-import { SetupNotice } from '@/components/setup-notice';
 
 const statusStyles: Record<string, string> = {
   paid: 'bg-brand-50 text-brand-700',
@@ -9,19 +8,13 @@ const statusStyles: Record<string, string> = {
 };
 
 export default async function PaymentsPage() {
-  if (!isSupabaseConfigured()) {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-semibold">Pagos</h1>
-        <SetupNotice />
-      </div>
-    );
-  }
-
+  const { business } = await requireBusiness();
   const supabase = await createClient();
+
   const { data: payments } = await supabase
     .from('payments')
     .select('id, amount_cents, status, due_date, clients(name)')
+    .eq('business_id', business.id)
     .order('due_date', { ascending: true });
 
   type PaymentRow = {
@@ -35,7 +28,7 @@ export default async function PaymentsPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Pagos</h1>
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-slate-500">
             <tr>
@@ -67,7 +60,8 @@ export default async function PaymentsPage() {
             {(payments ?? []).length === 0 && (
               <tr>
                 <td colSpan={4} className="px-4 py-6 text-center text-slate-400">
-                  No hay pagos registrados.
+                  No hay pagos registrados. La integración con Stripe y la conciliación de cobros
+                  llegarán en una siguiente etapa.
                 </td>
               </tr>
             )}

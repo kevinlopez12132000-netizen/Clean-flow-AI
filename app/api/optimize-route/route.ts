@@ -57,6 +57,35 @@ export async function POST(request: Request) {
 
   const supabase = await createClient();
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: 'No autenticado.' }, { status: 401 });
+  }
+
+  const { data: membership } = await supabase
+    .from('business_members')
+    .select('business_id')
+    .eq('user_id', user.id)
+    .limit(1)
+    .maybeSingle();
+  if (!membership) {
+    return NextResponse.json({ error: 'Completa el registro de tu negocio primero.' }, { status: 403 });
+  }
+
+  // Belt-and-suspenders check on top of RLS: make sure the crew actually
+  // belongs to the caller's business before optimizing anything for it.
+  const { data: crew } = await supabase
+    .from('crews')
+    .select('id')
+    .eq('id', crewId)
+    .eq('business_id', membership.business_id)
+    .maybeSingle();
+  if (!crew) {
+    return NextResponse.json({ error: 'Cuadrilla inválida.' }, { status: 404 });
+  }
+
   const startOfDay = new Date(`${date}T00:00:00`);
   const endOfDay = new Date(`${date}T23:59:59`);
 
@@ -64,6 +93,7 @@ export async function POST(request: Request) {
     .from('jobs')
     .select('id, scheduled_at, clients(name, lat, lng)')
     .eq('crew_id', crewId)
+    .eq('business_id', membership.business_id)
     .gte('scheduled_at', startOfDay.toISOString())
     .lte('scheduled_at', endOfDay.toISOString());
 
